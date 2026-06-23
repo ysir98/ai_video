@@ -38,18 +38,106 @@ function Save-AppConfig {
     return Read-AppConfig
 }
 
-# 需要脱敏的密钥字段，避免明文回传到前端。
-$script:SecretFields = @("textApiKey", "ttsApiKey", "voiceCloneApiKey", "videoApiKey")
+# 需要脱敏和本机加密保存的密钥字段，避免明文回传到前端或落盘。
+$script:SecretFields = @("textApiKey", "ttsApiKey", "voiceCloneApiKey", "avatarApiKey", "videoApiKey")
 $script:MaskedSecretValue = "********"
+
+function Get-ProtectedSecretField {
+    param([string]$Field)
+    return "$($Field)Protected"
+}
+
+function Protect-SecretValue {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return ""
+    }
+    $secure = ConvertTo-SecureString -String $Value -AsPlainText -Force
+    return "dpapi:$($secure | ConvertFrom-SecureString)"
+}
+
+function Unprotect-SecretValue {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return ""
+    }
+    if (-not $Value.StartsWith("dpapi:")) {
+        return $Value
+    }
+    try {
+        $secure = ConvertTo-SecureString -String $Value.Substring(6)
+        $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+        try {
+            return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+        } finally {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+        }
+    } catch {
+        return ""
+    }
+}
+
+function ConvertTo-PlainObject {
+    param($InputObject)
+    return ($InputObject | ConvertTo-Json -Depth 50 | ConvertFrom-Json)
+}
+
+function Protect-AppConfigSecrets {
+    param($Config)
+    if ($null -eq $Config) {
+        return [pscustomobject]@{}
+    }
+
+    $copy = ConvertTo-PlainObject $Config
+    if ($null -eq $copy.api) {
+        $copy | Add-Member -NotePropertyName api -NotePropertyValue ([pscustomobject]@{}) -Force
+    }
+
+    foreach ($field in $script:SecretFields) {
+        $protectedField = Get-ProtectedSecretField $field
+        $plainValue = [string]$copy.api.$field
+        $protectedValue = [string]$copy.api.$protectedField
+
+        if (-not [string]::IsNullOrWhiteSpace($plainValue) -and $plainValue -ne $script:MaskedSecretValue) {
+            $copy.api | Add-Member -NotePropertyName $protectedField -NotePropertyValue (Protect-SecretValue $plainValue) -Force
+        } elseif (-not [string]::IsNullOrWhiteSpace($protectedValue) -and -not $protectedValue.StartsWith("dpapi:")) {
+            $copy.api | Add-Member -NotePropertyName $protectedField -NotePropertyValue (Protect-SecretValue $protectedValue) -Force
+        }
+
+        $copy.api | Add-Member -NotePropertyName $field -NotePropertyValue "" -Force
+    }
+
+    return $copy
+}
+
+function Read-AppConfigForUse {
+    $config = Read-AppConfig
+    if ($config.api) {
+        foreach ($field in $script:SecretFields) {
+            $protectedField = Get-ProtectedSecretField $field
+            $plainValue = [string]$config.api.$field
+            $protectedValue = [string]$config.api.$protectedField
+            if ([string]::IsNullOrWhiteSpace($plainValue) -and -not [string]::IsNullOrWhiteSpace($protectedValue)) {
+                $config.api | Add-Member -NotePropertyName $field -NotePropertyValue (Unprotect-SecretValue $protectedValue) -Force
+            }
+        }
+    }
+    return $config
+}
 
 function Get-ConfigForClient {
     # 返回给前端展示用的配置：已设置的密钥替换为掩码，不泄露明文。
     $config = Read-AppConfig
     if ($config.api) {
         foreach ($field in $script:SecretFields) {
+            $protectedField = Get-ProtectedSecretField $field
             $value = [string]$config.api.$field
-            if (-not [string]::IsNullOrWhiteSpace($value)) {
+            $protectedValue = [string]$config.api.$protectedField
+            if (-not [string]::IsNullOrWhiteSpace($value) -or -not [string]::IsNullOrWhiteSpace($protectedValue)) {
                 $config.api.$field = $script:MaskedSecretValue
+            }
+            if ($config.api.PSObject.Properties.Name -contains $protectedField) {
+                $config.api.PSObject.Properties.Remove($protectedField)
             }
         }
     }
@@ -60,16 +148,45 @@ function Merge-ConfigSecrets {
     param($Incoming)
     # 保存时若密钥字段仍是掩码，说明用户未修改，保留磁盘上的原值。
     $existing = Read-AppConfig
+    if ($null -eq $Incoming.api) {
+        $Incoming | Add-Member -NotePropertyName api -NotePropertyValue ([pscustomobject]@{}) -Force
+    }
     if ($Incoming.api -and $existing.api) {
         foreach ($field in $script:SecretFields) {
+            $protectedField = Get-ProtectedSecretField $field
             $incomingValue = [string]$Incoming.api.$field
             if ($incomingValue -eq $script:MaskedSecretValue) {
-                $Incoming.api.$field = $existing.api.$field
+                $Incoming.api | Add-Member -NotePropertyName $field -NotePropertyValue "" -Force
+                $Incoming.api | Add-Member -NotePropertyName $protectedField -NotePropertyValue ([string]$existing.api.$protectedField) -Force
+            } elseif ([string]::IsNullOrWhiteSpace($incomingValue) -and -not [string]::IsNullOrWhiteSpace([string]$existing.api.$protectedField)) {
+                $Incoming.api | Add-Member -NotePropertyName $protectedField -NotePropertyValue "" -Force
             }
         }
     }
-    return $Incoming
+    return Protect-AppConfigSecrets $Incoming
 }
+
+function Initialize-SecureConfig {
+    try {
+        $config = Read-AppConfig
+        if ($config.api) {
+            $needsWrite = $false
+            foreach ($field in $script:SecretFields) {
+                $protectedField = Get-ProtectedSecretField $field
+                if (-not [string]::IsNullOrWhiteSpace([string]$config.api.$field) -or (-not [string]::IsNullOrWhiteSpace([string]$config.api.$protectedField) -and -not ([string]$config.api.$protectedField).StartsWith("dpapi:"))) {
+                    $needsWrite = $true
+                }
+            }
+            if ($needsWrite) {
+                Save-AppConfig (Protect-AppConfigSecrets $config) | Out-Null
+            }
+        }
+    } catch {
+        Write-Host "配置安全迁移失败：$($_.Exception.Message)"
+    }
+}
+
+Initialize-SecureConfig
 
 function ConvertFrom-ModelJson {
     param([string]$Content)
@@ -95,6 +212,105 @@ function ConvertFrom-ModelJson {
     }
 
     return $text | ConvertFrom-Json
+}
+
+function Get-ObjectProperty {
+    param($Object, [string]$Name, $Default = $null)
+    if ($null -eq $Object) {
+        return $Default
+    }
+    if ($Object.PSObject.Properties.Name -contains $Name) {
+        return $Object.$Name
+    }
+    return $Default
+}
+
+function Normalize-VideoScript {
+    param($Script, [string]$FallbackText = "", [string]$Mode = "avatar_only", [string]$Style = "知识口播")
+
+    if ($null -eq $Script) {
+        throw "脚本不能为空。"
+    }
+
+    $rawSegments = @(Get-ObjectProperty -Object $Script -Name "segments")
+    if ($rawSegments.Count -eq 0) {
+        throw "脚本必须包含至少一个 segments 片段。"
+    }
+
+    $items = @()
+    $index = 1
+    $totalDuration = 0
+    foreach ($segment in $rawSegments) {
+        $voiceText = ([string](Get-ObjectProperty -Object $segment -Name "voiceText")).Trim()
+        $subtitle = ([string](Get-ObjectProperty -Object $segment -Name "subtitle")).Trim()
+        $visualPrompt = ([string](Get-ObjectProperty -Object $segment -Name "visualPrompt")).Trim()
+        $sceneType = ([string](Get-ObjectProperty -Object $segment -Name "sceneType")).Trim()
+
+        if ([string]::IsNullOrWhiteSpace($voiceText)) {
+            throw "第 $index 个脚本片段缺少 voiceText。"
+        }
+        if ([string]::IsNullOrWhiteSpace($subtitle)) {
+            $subtitle = $voiceText
+        }
+        if ([string]::IsNullOrWhiteSpace($visualPrompt)) {
+            $visualSource = if ($voiceText.Length -gt 70) { $voiceText.Substring(0, 70) } else { $voiceText }
+            $visualPrompt = "围绕以下内容生成画面：$visualSource"
+        }
+        if ([string]::IsNullOrWhiteSpace($sceneType)) {
+            $sceneType = if ($Mode -eq "ai_video_only") { "ai_video" } else { "avatar" }
+        }
+
+        $durationValue = Get-ObjectProperty -Object $segment -Name "duration" -Default 0
+        $duration = 0.0
+        [double]::TryParse([string]$durationValue, [ref]$duration) | Out-Null
+        if ($duration -le 0) {
+            $duration = [Math]::Max(4, [Math]::Ceiling($voiceText.Length / 4.0))
+        }
+        $duration = [Math]::Max(1, [Math]::Round($duration, 2))
+        $totalDuration += $duration
+
+        $items += [pscustomobject]@{
+            index = $index
+            voiceText = $voiceText
+            subtitle = $subtitle
+            visualPrompt = $visualPrompt
+            duration = $duration
+            sceneType = $sceneType
+        }
+        $index += 1
+    }
+
+    $title = ([string](Get-ObjectProperty -Object $Script -Name "title")).Trim()
+    if ([string]::IsNullOrWhiteSpace($title)) {
+        $titleSource = if ($FallbackText.Length -gt 28) { $FallbackText.Substring(0, 28) } else { $FallbackText }
+        $title = "AI 视频 - $titleSource"
+    }
+
+    $summary = ([string](Get-ObjectProperty -Object $Script -Name "summary")).Trim()
+    if ([string]::IsNullOrWhiteSpace($summary)) {
+        $summary = if ($FallbackText.Length -gt 120) { $FallbackText.Substring(0, 120) } else { $FallbackText }
+    }
+
+    $keywords = @(Get-ObjectProperty -Object $Script -Name "keywords")
+    if ($keywords.Count -eq 1 -and $null -eq $keywords[0]) {
+        $keywords = @()
+    }
+
+    $estimated = Get-ObjectProperty -Object $Script -Name "estimatedDuration" -Default 0
+    $estimatedDuration = 0.0
+    [double]::TryParse([string]$estimated, [ref]$estimatedDuration) | Out-Null
+    if ($estimatedDuration -le 0) {
+        $estimatedDuration = $totalDuration
+    }
+
+    return [pscustomobject]@{
+        title = $title
+        summary = $summary
+        keywords = $keywords
+        style = if ([string]::IsNullOrWhiteSpace([string](Get-ObjectProperty -Object $Script -Name "style"))) { $Style } else { [string](Get-ObjectProperty -Object $Script -Name "style") }
+        estimatedDuration = [Math]::Max(1, [Math]::Round($estimatedDuration, 2))
+        segments = $items
+    }
 }
 
 function Test-CommandAvailable {
@@ -211,6 +427,7 @@ function Get-ProjectDetails {
         script = Join-Path $ProjectDir "script\script.json"
         scriptMarkdown = Join-Path $ProjectDir "script\script.md"
         assetPlan = Join-Path $ProjectDir "video\asset_plan.json"
+        providerResults = Join-Path $ProjectDir "video\provider_results.json"
         renderPlan = Join-Path $ProjectDir "output\render_plan.json"
         subtitles = Join-Path $ProjectDir "output\subtitles.srt"
         audio = Join-Path $ProjectDir "audio\voice.wav"
@@ -325,7 +542,7 @@ function Save-VoiceProfile {
 function Invoke-EnvironmentCheck {
     $speech = Test-SystemSpeech
     $ffmpegCommand = Get-Command ffmpeg -ErrorAction SilentlyContinue
-    $config = Read-AppConfig
+    $config = Read-AppConfigForUse
     $textApiReady = $false
     if ($config.api -and -not [string]::IsNullOrWhiteSpace($config.api.textEndpoint) -and -not [string]::IsNullOrWhiteSpace($config.api.textApiKey)) {
         $textApiReady = $true
@@ -481,7 +698,7 @@ function New-LocalScript {
     }
 
     $titleSource = if ($Text.Length -gt 28) { $Text.Substring(0, 28) } else { $Text }
-    return [pscustomobject]@{
+    $script = [pscustomobject]@{
         title = "AI 视频 - $titleSource"
         summary = if ($Text.Length -gt 120) { $Text.Substring(0, 120) } else { $Text }
         keywords = @()
@@ -489,6 +706,7 @@ function New-LocalScript {
         estimatedDuration = $totalDuration
         segments = $items
     }
+    return Normalize-VideoScript -Script $script -FallbackText $Text -Mode $Mode -Style $Style
 }
 
 function Get-ModeName {
@@ -608,7 +826,7 @@ $Text
         if ($null -eq $parsed -or $null -eq $parsed.segments -or @($parsed.segments).Count -eq 0) {
             return New-LocalScript -Text $Text -Mode $Mode -Style $Style
         }
-        return $parsed
+        return Normalize-VideoScript -Script $parsed -FallbackText $Text -Mode $Mode -Style $Style
     } catch {
         return New-LocalScript -Text $Text -Mode $Mode -Style $Style
     }
@@ -665,15 +883,209 @@ function Write-ScriptMarkdown {
     Set-Content -Encoding UTF8 -Path $Path -Value ($lines -join "`r`n")
 }
 
+function Get-ApiKey {
+    param($Api, [string]$Field)
+    if ($null -eq $Api) {
+        return ""
+    }
+    return [string]$Api.$Field
+}
+
+function Save-Base64File {
+    param([string]$Base64, [string]$Path)
+    $clean = $Base64
+    if ($clean -match ",") {
+        $clean = ($clean -split ",", 2)[1]
+    }
+    $bytes = [Convert]::FromBase64String($clean)
+    [System.IO.File]::WriteAllBytes($Path, $bytes)
+}
+
+function Download-ProviderFile {
+    param([string]$Url, [string]$Path, [hashtable]$Headers = @{})
+    Invoke-WebRequest -Uri $Url -Headers $Headers -OutFile $Path -UseBasicParsing | Out-Null
+    return $Path
+}
+
+function Get-ProviderOutputValue {
+    param($Response, [string[]]$Names)
+    if ($null -eq $Response) {
+        return ""
+    }
+    foreach ($name in $Names) {
+        if ($Response.PSObject.Properties.Name -contains $name) {
+            $value = [string]$Response.$name
+            if (-not [string]::IsNullOrWhiteSpace($value)) {
+                return $value
+            }
+        }
+    }
+    if ($Response.PSObject.Properties.Name -contains "data" -and $Response.data) {
+        return Get-ProviderOutputValue -Response $Response.data -Names $Names
+    }
+    if ($Response.PSObject.Properties.Name -contains "result" -and $Response.result) {
+        return Get-ProviderOutputValue -Response $Response.result -Names $Names
+    }
+    return ""
+}
+
+function Invoke-JsonProvider {
+    param(
+        [string]$Endpoint,
+        [string]$ApiKey,
+        $Payload,
+        [string]$OutputPath,
+        [string]$Kind,
+        [string]$BearerPrefix = "Bearer"
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Endpoint)) {
+        return @{
+            success = $false
+            skipped = $true
+            output = $null
+            message = "$Kind provider endpoint 未配置。"
+        }
+    }
+
+    try {
+        $headers = @{ "Content-Type" = "application/json" }
+        if (-not [string]::IsNullOrWhiteSpace($ApiKey)) {
+            $headers["Authorization"] = "$BearerPrefix $ApiKey"
+        }
+        $body = $Payload | ConvertTo-Json -Depth 30
+        $response = Invoke-WebRequest -Method Post -Uri $Endpoint -Headers $headers -Body $body -UseBasicParsing
+        $contentType = [string]$response.Headers["Content-Type"]
+
+        if ($contentType -match "audio|video|image|octet-stream") {
+            if ($response.RawContentStream) {
+                $fileStream = [System.IO.File]::Create($OutputPath)
+                try {
+                    $response.RawContentStream.CopyTo($fileStream)
+                } finally {
+                    $fileStream.Dispose()
+                }
+            } else {
+                [System.IO.File]::WriteAllBytes($OutputPath, [byte[]][char[]]$response.Content)
+            }
+            return @{ success = $true; output = $OutputPath; message = "$Kind provider 返回二进制文件。" }
+        }
+
+        $json = $response.Content | ConvertFrom-Json
+        $url = Get-ProviderOutputValue -Response $json -Names @("url", "audioUrl", "videoUrl", "imageUrl", "outputUrl", "fileUrl")
+        $base64 = Get-ProviderOutputValue -Response $json -Names @("base64", "audioBase64", "videoBase64", "imageBase64", "fileBase64")
+
+        if (-not [string]::IsNullOrWhiteSpace($base64)) {
+            Save-Base64File -Base64 $base64 -Path $OutputPath
+            return @{ success = $true; output = $OutputPath; message = "$Kind provider 返回 base64 文件。" }
+        }
+        if (-not [string]::IsNullOrWhiteSpace($url)) {
+            Download-ProviderFile -Url $url -Path $OutputPath -Headers @{} | Out-Null
+            return @{ success = $true; output = $OutputPath; message = "$Kind provider 返回文件 URL。" }
+        }
+
+        return @{ success = $false; output = $null; response = $json; message = "$Kind provider 未返回可识别的文件字段。" }
+    } catch {
+        return @{ success = $false; output = $null; message = "$Kind provider 调用失败：$($_.Exception.Message)" }
+    }
+}
+
+function Invoke-ExternalTts {
+    param(
+        [string]$Text,
+        [string]$Path,
+        $VoiceConfig,
+        $Config
+    )
+
+    $api = $Config.api
+    $payload = [pscustomobject]@{
+        text = $Text
+        voice = $VoiceConfig
+        format = "wav"
+    }
+    return Invoke-JsonProvider -Endpoint ([string]$api.ttsEndpoint) -ApiKey (Get-ApiKey -Api $api -Field "ttsApiKey") -Payload $payload -OutputPath $Path -Kind "TTS"
+}
+
+function Invoke-VisualProviders {
+    param(
+        [string]$ProjectDir,
+        [string]$Mode,
+        $Script,
+        $Options,
+        $Config
+    )
+
+    $videoDir = Join-Path $ProjectDir "video"
+    $imageDir = Join-Path $ProjectDir "image"
+    $api = $Config.api
+    $outputs = @()
+
+    foreach ($segment in $Script.segments) {
+        $segmentTag = "{0:000}" -f [int]$segment.index
+        $needsAvatar = $Mode -eq "avatar_only" -or $Mode -eq "mixed_avatar_ai_video" -or $Mode -eq "animated_avatar"
+        $needsAiVideo = $Mode -eq "ai_video_only" -or $Mode -eq "mixed_avatar_ai_video"
+
+        if ($needsAvatar -and -not [string]::IsNullOrWhiteSpace([string]$api.avatarEndpoint)) {
+            $avatarPath = Join-Path $videoDir "avatar_$segmentTag.mp4"
+            $payload = [pscustomobject]@{
+                mode = $Mode
+                segment = $segment
+                options = $Options
+            }
+            $result = Invoke-JsonProvider -Endpoint ([string]$api.avatarEndpoint) -ApiKey (Get-ApiKey -Api $api -Field "avatarApiKey") -Payload $payload -OutputPath $avatarPath -Kind "Avatar"
+            $outputs += [pscustomobject]@{ segment = $segment.index; kind = "avatar"; result = $result }
+        }
+
+        if ($needsAiVideo -and -not [string]::IsNullOrWhiteSpace([string]$api.videoEndpoint)) {
+            $scenePath = Join-Path $videoDir "scene_$segmentTag.mp4"
+            $payload = [pscustomobject]@{
+                prompt = $segment.visualPrompt
+                duration = $segment.duration
+                ratio = $Options.ratio
+                resolution = $Options.resolution
+                segment = $segment
+            }
+            $result = Invoke-JsonProvider -Endpoint ([string]$api.videoEndpoint) -ApiKey (Get-ApiKey -Api $api -Field "videoApiKey") -Payload $payload -OutputPath $scenePath -Kind "AI video"
+            $outputs += [pscustomobject]@{ segment = $segment.index; kind = "ai_video"; result = $result }
+        }
+    }
+
+    $providerLogPath = Join-Path $ProjectDir "video\provider_results.json"
+    Set-Content -Encoding UTF8 -Path $providerLogPath -Value (@($outputs) | ConvertTo-Json -Depth 30)
+    return @{
+        outputs = $outputs
+        logPath = $providerLogPath
+    }
+}
+
 function New-VoiceAudio {
     param(
         [string]$Text,
         [string]$Path,
-        $VoiceConfig
+        $VoiceConfig,
+        $Config
     )
 
     $textPath = [System.IO.Path]::ChangeExtension($Path, ".txt")
     Set-Content -Encoding UTF8 -Path $textPath -Value $Text
+
+    $provider = ""
+    if ($VoiceConfig -and $VoiceConfig.type -eq "external" -and $Config.api) {
+        $provider = [string]$Config.api.ttsProvider
+    }
+    if ([string]::IsNullOrWhiteSpace($provider) -and $Config.api -and -not [string]::IsNullOrWhiteSpace([string]$Config.api.ttsEndpoint)) {
+        $provider = [string]$Config.api.ttsProvider
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($provider) -and $provider -ne "windows_system_speech") {
+        $external = Invoke-ExternalTts -Text $Text -Path $Path -VoiceConfig $VoiceConfig -Config $Config
+        if ($external.success) {
+            $external.textPath = $textPath
+            $external.skipped = $false
+            return $external
+        }
+    }
 
     if ($Text.Length -gt 1500) {
         return @{
@@ -735,6 +1147,37 @@ function Get-VideoSize {
     return "1080x1920"
 }
 
+function ConvertTo-FfmpegFilterPath {
+    param([string]$Path)
+    $full = [System.IO.Path]::GetFullPath($Path).Replace("\", "/")
+    $full = $full -replace ":", "\:"
+    $full = $full -replace "'", "\\'"
+    return $full
+}
+
+function Get-ProjectVisualAssets {
+    param([string]$ProjectDir)
+    $videoDir = Join-Path $ProjectDir "video"
+    $imageDir = Join-Path $ProjectDir "image"
+
+    $videos = @()
+    foreach ($pattern in @("scene_*.mp4", "avatar_*.mp4", "*.mp4", "*.mov")) {
+        $videos += @(Get-ChildItem -File -Path $videoDir -Filter $pattern -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "asset_plan.json" })
+    }
+    $videos = @($videos | Sort-Object Name -Unique)
+
+    $images = @()
+    foreach ($pattern in @("scene_*.png", "scene_*.jpg", "scene_*.jpeg", "*.png", "*.jpg", "*.jpeg")) {
+        $images += @(Get-ChildItem -File -Path $imageDir -Filter $pattern -ErrorAction SilentlyContinue)
+    }
+    $images = @($images | Sort-Object Name -Unique)
+
+    return [pscustomobject]@{
+        videos = $videos
+        images = $images
+    }
+}
+
 function Invoke-ComposeVideo {
     param(
         [string]$ProjectDir,
@@ -751,6 +1194,14 @@ function Invoke-ComposeVideo {
     $resolution = if ($ProjectConfig.video.resolution) { $ProjectConfig.video.resolution } else { "1080p" }
     $fps = if ($ProjectConfig.video.fps) { [int]$ProjectConfig.video.fps } else { 30 }
     $size = Get-VideoSize -Ratio $ratio -Resolution $resolution
+    $assets = Get-ProjectVisualAssets -ProjectDir $ProjectDir
+    $hasAudio = -not [string]::IsNullOrWhiteSpace($AudioPath) -and (Test-Path $AudioPath)
+    $subtitleEnabled = $ProjectConfig.subtitle -and $ProjectConfig.subtitle.enabled -and (Test-Path $SrtPath)
+    $subtitleFilter = if ($subtitleEnabled) {
+        "subtitles='$(ConvertTo-FfmpegFilterPath $SrtPath)':force_style='FontName=Arial,FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=80'"
+    } else {
+        ""
+    }
 
     $plan = [pscustomobject]@{
         output = $finalPath
@@ -760,7 +1211,10 @@ function Invoke-ComposeVideo {
         audio = $AudioPath
         subtitles = $SrtPath
         mode = $ProjectConfig.generationMode
-        note = "安装 ffmpeg 并重新生成后可输出 mp4。当前会保留音频、字幕和项目配置。"
+        visualVideos = @($assets.videos | ForEach-Object { $_.FullName })
+        visualImages = @($assets.images | ForEach-Object { $_.FullName })
+        subtitleBurnIn = [bool]$subtitleEnabled
+        note = "安装 ffmpeg 并重新生成后可输出 mp4；检测到可用素材时优先使用素材，否则使用纯色背景。"
     }
     $planPath = Join-Path $outputDir "render_plan.json"
     Set-Content -Encoding UTF8 -Path $planPath -Value ($plan | ConvertTo-Json -Depth 10)
@@ -776,12 +1230,34 @@ function Invoke-ComposeVideo {
     }
 
     try {
-        $colorInput = "color=c=0x111827:s=$($size):d=$($duration):r=$fps"
-        $args = @(
-            "-y",
-            "-f", "lavfi",
-            "-i", $colorInput,
-            "-i", $AudioPath,
+        $filterParts = @("scale=$($size):force_original_aspect_ratio=increase", "crop=$($size)", "setsar=1", "fps=$fps")
+        if (-not [string]::IsNullOrWhiteSpace($subtitleFilter)) {
+            $filterParts += $subtitleFilter
+        }
+        $vf = $filterParts -join ","
+        $args = @("-y")
+
+        if (@($assets.videos).Count -gt 0) {
+            $concatPath = Join-Path $outputDir "concat_inputs.txt"
+            $concatLines = @($assets.videos | ForEach-Object { "file '$($_.FullName.Replace("'", "''"))'" })
+            Set-Content -Encoding ASCII -Path $concatPath -Value ($concatLines -join "`n")
+            $args += @("-f", "concat", "-safe", "0", "-i", $concatPath)
+        } elseif (@($assets.images).Count -gt 0) {
+            $args += @("-loop", "1", "-framerate", [string]$fps, "-t", [string]$duration, "-i", $assets.images[0].FullName)
+        } else {
+            $colorInput = "color=c=0x111827:s=$($size):d=$($duration):r=$fps"
+            $args += @("-f", "lavfi", "-i", $colorInput)
+        }
+
+        if ($hasAudio) {
+            $args += @("-i", $AudioPath)
+        } else {
+            $args += @("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100")
+        }
+
+        $args += @(
+            "-t", [string]$duration,
+            "-vf", $vf,
             "-shortest",
             "-c:v", "libx264",
             "-c:a", "aac",
@@ -796,7 +1272,7 @@ function Invoke-ComposeVideo {
             success = $true
             output = $finalPath
             renderPlan = $planPath
-            message = "已生成基础 mp4。"
+            message = if (@($assets.videos).Count -gt 0 -or @($assets.images).Count -gt 0) { "已使用可用画面素材并合成 mp4。" } else { "已使用默认背景并合成 mp4。" }
         }
     } catch {
         return @{
@@ -832,7 +1308,7 @@ function New-VideoProject {
     $mode = if ($options.generationMode) { [string]$options.generationMode } else { "avatar_only" }
     $style = if ($options.style) { [string]$options.style } else { "知识口播" }
     if ($Payload.script) {
-        $script = $Payload.script
+        $script = Normalize-VideoScript -Script $Payload.script -FallbackText $text -Mode $mode -Style $style
     } else {
         $script = Invoke-TextModel -Text $text -Mode $mode -Style $style -Config $config
     }
@@ -846,9 +1322,11 @@ function New-VideoProject {
     $assetPlanPath = Join-Path $projectDir "video\asset_plan.json"
     Set-Content -Encoding UTF8 -Path $assetPlanPath -Value ($assetPlan | ConvertTo-Json -Depth 30)
 
+    $visualResult = Invoke-VisualProviders -ProjectDir $projectDir -Mode $mode -Script $script -Options $options -Config $config
+
     $voiceText = (($script.segments | ForEach-Object { $_.voiceText }) -join "`r`n")
     $audioPath = Join-Path $projectDir "audio\voice.wav"
-    $voiceResult = New-VoiceAudio -Text $voiceText -Path $audioPath -VoiceConfig $options.voice
+    $voiceResult = New-VoiceAudio -Text $voiceText -Path $audioPath -VoiceConfig $options.voice -Config $config
 
     if ($options.voice -and $options.voice.profileId) {
         $sourceProfilePath = Join-Path (Join-Path $VoiceProfilesRoot ([string]$options.voice.profileId)) "profile.json"
@@ -878,6 +1356,12 @@ function New-VideoProject {
         subtitle = @{
             enabled = $true
         }
+        providers = @{
+            visuals = $visualResult.logPath
+            ttsProvider = if ($config.api) { [string]$config.api.ttsProvider } else { "" }
+            avatarProvider = if ($config.api) { [string]$config.api.avatarProvider } else { "" }
+            videoProvider = if ($config.api) { [string]$config.api.videoProvider } else { "" }
+        }
         output = @{
             format = "mp4"
             path = Join-Path $projectDir "output"
@@ -888,7 +1372,8 @@ function New-VideoProject {
     $projectJsonPath = Join-Path $projectDir "project.json"
     Set-Content -Encoding UTF8 -Path $projectJsonPath -Value ($projectConfig | ConvertTo-Json -Depth 30)
 
-    $composeResult = Invoke-ComposeVideo -ProjectDir $projectDir -ProjectConfig $projectConfig -Script $script -AudioPath $audioPath -SrtPath $srtPath
+    $audioForCompose = if (Test-Path $audioPath) { $audioPath } else { "" }
+    $composeResult = Invoke-ComposeVideo -ProjectDir $projectDir -ProjectConfig $projectConfig -Script $script -AudioPath $audioForCompose -SrtPath $srtPath
 
     $logPath = Join-Path $projectDir "logs\task.log"
     $logLines = @(
@@ -896,6 +1381,7 @@ function New-VideoProject {
         "mode=$mode",
         "script=$scriptJsonPath",
         "audio=$audioPath",
+        "visuals=$($visualResult.logPath)",
         "tts=$($voiceResult.message)",
         "compose=$($composeResult.message)"
     )
@@ -915,10 +1401,12 @@ function New-VideoProject {
             project = $projectJsonPath
             renderPlan = $composeResult.renderPlan
             video = $composeResult.output
+            providerResults = $visualResult.logPath
             log = $logPath
         }
         status = @{
             tts = $voiceResult
+            visuals = $visualResult.outputs
             compose = $composeResult
         }
     }
@@ -947,7 +1435,8 @@ function Invoke-ProjectCompose {
 
     $projectConfig = Get-Content -Raw -Encoding UTF8 -Path $projectPath | ConvertFrom-Json
     $script = Get-Content -Raw -Encoding UTF8 -Path $scriptPath | ConvertFrom-Json
-    $composeResult = Invoke-ComposeVideo -ProjectDir $projectDir -ProjectConfig $projectConfig -Script $script -AudioPath $audioPath -SrtPath $srtPath
+    $audioForCompose = if (Test-Path $audioPath) { $audioPath } else { "" }
+    $composeResult = Invoke-ComposeVideo -ProjectDir $projectDir -ProjectConfig $projectConfig -Script $script -AudioPath $audioForCompose -SrtPath $srtPath
 
     $logPath = Join-Path $projectDir "logs\task.log"
     Add-Content -Encoding UTF8 -Path $logPath -Value ("recompose={0}" -f $composeResult.message)
@@ -1191,7 +1680,7 @@ function Handle-Request {
         $options = $requestObject.options
         $mode = if ($options.generationMode) { [string]$options.generationMode } else { "avatar_only" }
         $style = if ($options.style) { [string]$options.style } else { "知识口播" }
-        $script = Invoke-TextModel -Text $text -Mode $mode -Style $style -Config (Read-AppConfig)
+        $script = Invoke-TextModel -Text $text -Mode $mode -Style $style -Config (Read-AppConfigForUse)
         return @{
             status = 200
             type = "application/json; charset=utf-8"

@@ -1,0 +1,51 @@
+﻿{
+    "projectName":  "project_20260623_172542",
+    "inputFile":  "D:\\linshi\\video\\projects\\project_20260623_172542\\input\\source.txt",
+    "generationMode":  "mixed_avatar_ai_video",
+    "script":  {
+                   "summary":  "人工智能正在改变内容生产方式。过去制作一条完整视频通常需要文案、配音、拍摄、剪辑和后期多个环节配合完成。现在，通过文本理解、语音合成、数字人口播和 AI 视频生成，可以把一篇普通文稿快速转换成可发布的视频内容。\n\n本工具的目标是把这些步骤整",
+                   "title":  "AI 视频 - 人工智能正在改变内容生产方式。过去制作一条完整视频通常需",
+                   "segments":  [
+                                    {
+                                        "index":  1,
+                                        "voiceText":  "人工智能正在改变内容生产方式。过去制作一条完整视频通常需要文案、配音、拍摄、剪辑和后期多个环节配合完成。现在，通过文本理解、语音合成、数字人口播和 AI 视频生成，可以把一篇普通文稿快速转换成可发布的视频内容。",
+                                        "subtitle":  "人工智能正在改变内容生产方式。过去制作一条完整视频通常需要文案、配音、拍摄、剪辑和后期多个环节配合完成。现在，通过文本理解、语音合成、数字人口播和 AI 视频生成，可以把一篇普通文稿快速转换成可发布的视频内容。",
+                                        "visualPrompt":  "围绕以下内容生成画面：人工智能正在改变内容生产方式。过去制作一条完整视频通常需要文案、配音、拍摄、剪辑和后期多个环节配合完成。现在，通过文本理解、语音合成、数字人",
+                                        "duration":  27,
+                                        "sceneType":  "avatar"
+                                    },
+                                    {
+                                        "index":  2,
+                                        "voiceText":  "本工具的目标是把这些步骤整合到本地电脑中。用户只需要导入一个 txt 文件，系统就能生成口播脚本、配音音频、字幕文件和视频合成配置。后续接入数字人和 AI 视频接口后，还可以进一步自动生成完整的数字人口播视频。",
+                                        "subtitle":  "本工具的目标是把这些步骤整合到本地电脑中。用户只需要导入一个 txt 文件，系统就能生成口播脚本、配音音频、字幕文件和视频合成配置。后续接入数字人和 AI 视频接口后，还可以进一步自动生成完整的数字人口播视频。",
+                                        "visualPrompt":  "围绕以下内容生成画面：本工具的目标是把这些步骤整合到本地电脑中。用户只需要导入一个 txt 文件，系统就能生成口播脚本、配音音频、字幕文件和视频合成配置。后续接入",
+                                        "duration":  27,
+                                        "sceneType":  "avatar"
+                                    }
+                                ]
+               },
+    "voice":  {
+                  "type":  "system",
+                  "rate":  0,
+                  "volume":  100
+              },
+    "video":  {
+                  "fps":  30,
+                  "ratio":  "9:16",
+                  "resolution":  "720p"
+              },
+    "subtitle":  {
+                     "enabled":  true
+                 },
+    "providers":  {
+                      "ttsProvider":  "windows_system_speech",
+                      "avatarProvider":  "",
+                      "visuals":  "D:\\linshi\\video\\projects\\project_20260623_172542\\video\\provider_results.json",
+                      "videoProvider":  ""
+                  },
+    "output":  {
+                   "path":  "D:\\linshi\\video\\projects\\project_20260623_172542\\output",
+                   "format":  "mp4"
+               },
+    "createdAt":  "2026-06-23T17:25:42"
+}

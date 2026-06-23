@@ -190,6 +190,7 @@ async function loadConfig() {
     document.querySelector("#voiceCloneEndpointInput").value = api.voiceCloneEndpoint || "";
     document.querySelector("#voiceCloneApiKeyInput").value = api.voiceCloneApiKey || "";
     document.querySelector("#avatarEndpointInput").value = api.avatarEndpoint || "";
+    document.querySelector("#avatarApiKeyInput").value = api.avatarApiKey || "";
     document.querySelector("#videoEndpointInput").value = api.videoEndpoint || "";
     document.querySelector("#videoApiKeyInput").value = api.videoApiKey || "";
     configStatus.textContent = `已读取配置：${data.path}`;
@@ -215,6 +216,7 @@ async function saveConfig() {
       voiceCloneEndpoint: document.querySelector("#voiceCloneEndpointInput").value.trim(),
       voiceCloneApiKey: document.querySelector("#voiceCloneApiKeyInput").value.trim(),
       avatarEndpoint: document.querySelector("#avatarEndpointInput").value.trim(),
+      avatarApiKey: document.querySelector("#avatarApiKeyInput").value.trim(),
       videoEndpoint: document.querySelector("#videoEndpointInput").value.trim(),
       videoApiKey: document.querySelector("#videoApiKeyInput").value.trim()
     },
