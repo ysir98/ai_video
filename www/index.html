@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 视频生成工具</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">AI</div>
+        <div>
+          <h1>视频生成工作台</h1>
+          <p>文本到口播视频</p>
+        </div>
+      </div>
+      <nav class="steps" aria-label="生成步骤">
+        <button class="active" data-target="textSection" type="button">1 导入文本</button>
+        <button data-target="scriptSection" type="button">2 脚本确认</button>
+        <button data-target="modeSection" type="button">3 模式配置</button>
+        <button data-target="voiceSection" type="button">4 声音配置</button>
+        <button data-target="configSection" type="button">5 API 配置</button>
+        <button data-target="projectSection" type="button">6 合成导出</button>
+      </nav>
+      <div class="health" id="health">正在检测环境...</div>
+    </aside>
+
+    <section class="workspace">
+      <header class="toolbar">
+        <div>
+          <h2>新建视频项目</h2>
+          <p>选择 txt 文件，配置生成模式后开始生成项目产物。</p>
+        </div>
+        <button id="generateBtn" class="primary-btn" type="button">开始生成</button>
+      </header>
+
+      <section class="panel environment-panel" id="environmentSection">
+        <div class="panel-title">
+          <h3>运行环境检查</h3>
+          <button id="refreshEnvBtn" class="ghost-btn" type="button">重新检查</button>
+        </div>
+        <div id="environmentList" class="environment-list">正在检查...</div>
+        <div id="installPlan" class="install-plan"></div>
+      </section>
+
+      <section class="panel" id="textSection">
+        <div class="panel-title">
+          <h3>文本内容</h3>
+          <label class="file-btn">
+            选择 TXT
+            <input id="fileInput" type="file" accept=".txt,text/plain">
+          </label>
+        </div>
+        <textarea id="textInput" placeholder="在这里粘贴文本，或选择本地 txt 文件。"></textarea>
+        <div class="meta-row">
+          <span id="textStats">0 字，预计 0 秒</span>
+          <div class="inline-actions">
+            <button id="draftScriptBtn" class="ghost-btn" type="button">解读/润色脚本</button>
+            <button id="clearBtn" class="ghost-btn" type="button">清空</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="scriptSection">
+        <div class="panel-title">
+          <h3>脚本确认</h3>
+          <div class="inline-actions">
+            <button id="formatScriptBtn" class="ghost-btn" type="button">格式化 JSON</button>
+            <button id="clearDraftBtn" class="ghost-btn" type="button">清除草稿</button>
+          </div>
+        </div>
+        <p class="form-status">先点击“解读/润色脚本”，确认或修改下面脚本后再点击“开始生成”。</p>
+        <textarea id="scriptDraftInput" class="script-draft-input" placeholder="这里会显示 AI 解读/润色后的结构化脚本，可手动修改。"></textarea>
+        <p id="scriptDraftStatus" class="form-status">尚未生成脚本草稿。</p>
+      </section>
+
+      <section class="panel" id="modeSection">
+        <div class="panel-title">
+          <h3>视频生成模式</h3>
+        </div>
+        <div class="mode-grid" role="radiogroup" aria-label="视频生成模式">
+          <label class="mode-card selected">
+            <input type="radio" name="mode" value="avatar_only" checked>
+            <strong>单数字人</strong>
+            <span>真人口播、课程讲解、新闻播报</span>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="mode" value="ai_video_only">
+            <strong>单 AI 创作视频</strong>
+            <span>无人物出镜的画面创作类视频</span>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="mode" value="mixed_avatar_ai_video">
+            <strong>混合数字人与 AI 视频</strong>
+            <span>讲解与辅助画面结合</span>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="mode" value="animated_avatar">
+            <strong>数字人动画形象</strong>
+            <span>虚拟主播、卡通 IP、二次元形象</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-grid">
+        <div class="panel compact">
+          <h3>脚本风格</h3>
+          <select id="styleSelect">
+            <option>知识口播</option>
+            <option>新闻播报</option>
+            <option>产品介绍</option>
+            <option>短视频带货</option>
+            <option>情感故事</option>
+            <option>课程讲解</option>
+          </select>
+        </div>
+
+        <div class="panel compact">
+          <h3>画面比例</h3>
+          <select id="ratioSelect">
+            <option value="9:16">9:16 竖屏</option>
+            <option value="16:9">16:9 横屏</option>
+            <option value="1:1">1:1 方屏</option>
+          </select>
+        </div>
+
+        <div class="panel compact">
+          <h3>分辨率</h3>
+          <select id="resolutionSelect">
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+          </select>
+        </div>
+
+        <div class="panel compact voice-panel" id="voiceSection">
+          <h3>语音</h3>
+          <label>
+            声音类型
+            <select id="voiceTypeSelect">
+              <option value="system">系统语音</option>
+              <option value="clone">克隆音色</option>
+            </select>
+          </label>
+          <label>
+            已保存音色
+            <select id="voiceProfileSelect">
+              <option value="">未选择</option>
+            </select>
+          </label>
+          <div class="inline-fields">
+            <label>
+              语速
+              <input id="voiceRate" type="number" min="-10" max="10" value="0">
+            </label>
+            <label>
+              音量
+              <input id="voiceVolume" type="number" min="0" max="100" value="100">
+            </label>
+          </div>
+          <div class="voice-clone-box">
+            <input id="voiceSampleInput" type="file" accept=".wav,.mp3,.m4a,.aac,.flac,.ogg,audio/*">
+            <input id="voiceProfileName" type="text" placeholder="音色名称，例如：我的旁白音色">
+            <button id="saveVoiceProfileBtn" class="ghost-btn" type="button">保存音色样本</button>
+            <p id="voiceProfileStatus">保存后可在后续项目中重复选择。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="configSection">
+        <div class="panel-title">
+          <h3>API 配置</h3>
+          <button id="saveConfigBtn" class="ghost-btn" type="button">保存配置</button>
+        </div>
+        <div class="config-grid">
+          <label>
+            文本模型接口
+            <input id="textEndpointInput" type="text" placeholder="https://api.example.com/v1/chat/completions">
+          </label>
+          <label>
+            文本模型 Key
+            <input id="textApiKeyInput" type="password" placeholder="sk-...">
+          </label>
+          <label>
+            文本模型名称
+            <input id="textModelInput" type="text" placeholder="gpt-4.1-mini">
+          </label>
+          <label>
+            TTS 服务商
+            <input id="ttsProviderInput" type="text" placeholder="windows_system_speech / your_tts_provider">
+          </label>
+          <label>
+            TTS 接口
+            <input id="ttsEndpointInput" type="text" placeholder="https://api.example.com/tts">
+          </label>
+          <label>
+            TTS Key
+            <input id="ttsApiKeyInput" type="password">
+          </label>
+          <label>
+            语音克隆服务商
+            <input id="voiceCloneProviderInput" type="text" placeholder="your_voice_clone_provider">
+          </label>
+          <label>
+            语音克隆接口
+            <input id="voiceCloneEndpointInput" type="text">
+          </label>
+          <label>
+            语音克隆 Key
+            <input id="voiceCloneApiKeyInput" type="password">
+          </label>
+          <label>
+            数字人接口
+            <input id="avatarEndpointInput" type="text">
+          </label>
+          <label>
+            AI 视频接口
+            <input id="videoEndpointInput" type="text">
+          </label>
+          <label>
+            视频接口 Key
+            <input id="videoApiKeyInput" type="password">
+          </label>
+        </div>
+        <p id="configStatus" class="form-status">配置会保存到本地 config/appsettings.json。</p>
+      </section>
+
+      <section class="panel result-panel" id="projectSection">
+        <div class="panel-title">
+          <h3>项目列表</h3>
+          <button id="refreshProjectsBtn" class="ghost-btn" type="button">刷新项目</button>
+        </div>
+        <div id="projectList" class="project-list"></div>
+      </section>
+
+      <section class="panel result-panel">
+        <div class="panel-title">
+          <h3>项目详情</h3>
+          <div class="detail-actions">
+            <span id="selectedProjectLabel" class="selected-project-label">未选择项目</span>
+            <button id="composeProjectBtn" class="ghost-btn" type="button">生成/重新合成视频</button>
+          </div>
+        </div>
+        <pre id="resultBox">尚未生成。</pre>
+      </section>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

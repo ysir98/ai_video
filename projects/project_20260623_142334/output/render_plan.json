@@ -1,0 +1,10 @@
+﻿{
+    "output":  "D:\\linshi\\video\\projects\\project_20260623_142334\\output\\final.mp4",
+    "size":  "720x1280",
+    "fps":  30,
+    "duration":  54,
+    "audio":  "D:\\linshi\\video\\projects\\project_20260623_142334\\audio\\voice.wav",
+    "subtitles":  "D:\\linshi\\video\\projects\\project_20260623_142334\\output\\subtitles.srt",
+    "mode":  "mixed_avatar_ai_video",
+    "note":  "安装 ffmpeg 并重新生成后可输出 mp4。当前会保留音频、字幕和项目配置。"
+}

@@ -1,0 +1,132 @@
+﻿{
+    "ok":  true,
+    "environment":  {
+                        "root":  "D:\\linshi\\video",
+                        "configPath":  "D:\\linshi\\video\\config\\appsettings.json",
+                        "ok":  true,
+                        "checkedAt":  "2026-06-23T13:32:10",
+                        "installPlan":  {
+                                            "winget":  false,
+                                            "packageManager":  "manual",
+                                            "choco":  false,
+                                            "commands":  {
+                                                             "checkOnly":  ".\\scripts\\check-env.ps1",
+                                                             "installFfmpeg":  "请手动安装 ffmpeg 并加入 PATH，然后重新启动本工具。"
+                                                         },
+                                            "note":  "本程序不会自动安装依赖。只有用户在终端显式运行带 -Install 的脚本时才会安装。"
+                                        },
+                        "speechVoices":  [
+                                             "Microsoft Huihui Desktop",
+                                             "Microsoft Zira Desktop"
+                                         ],
+                        "projectsRoot":  "D:\\linshi\\video\\projects",
+                        "checks":  [
+                                       {
+                                           "id":  "powershell",
+                                           "name":  "PowerShell",
+                                           "ok":  true,
+                                           "required":  true,
+                                           "message":  "本地服务运行环境可用。",
+                                           "version":  "5.1.26100.6584"
+                                       },
+                                       {
+                                           "id":  "system_speech",
+                                           "name":  "Windows 系统语音",
+                                           "ok":  true,
+                                           "required":  false,
+                                           "message":  "Windows 系统语音可用。",
+                                           "version":  ""
+                                       },
+                                       {
+                                           "id":  "ffmpeg",
+                                           "name":  "ffmpeg",
+                                           "ok":  false,
+                                           "required":  false,
+                                           "message":  "未检测到 ffmpeg。仍可生成脚本、音频、字幕和渲染计划。",
+                                           "version":  ""
+                                       },
+                                       {
+                                           "id":  "text_api",
+                                           "name":  "AI 文本接口",
+                                           "ok":  false,
+                                           "required":  false,
+                                           "message":  "未配置文本接口，将使用本地规则生成脚本。",
+                                           "version":  ""
+                                       },
+                                       {
+                                           "id":  "node",
+                                           "name":  "Node.js",
+                                           "ok":  false,
+                                           "required":  false,
+                                           "message":  "当前 MVP 不依赖 Node.js。",
+                                           "version":  ""
+                                       },
+                                       {
+                                           "id":  "python",
+                                           "name":  "Python",
+                                           "ok":  false,
+                                           "required":  false,
+                                           "message":  "当前 MVP 不依赖 Python。",
+                                           "version":  ""
+                                       }
+                                   ]
+                    },
+    "project":  {
+                    "projectId":  "project_20260623_133210",
+                    "projectDir":  "D:\\linshi\\video\\projects\\project_20260623_133210",
+                    "script":  {
+                                   "title":  "AI 视频 - 人工智能正在改变内容生产方式。过去制作一条完整视频通常需",
+                                   "summary":  "人工智能正在改变内容生产方式。过去制作一条完整视频通常需要文案、配音、拍摄、剪辑和后期多个环节配合完成。现在，通过文本理解、语音合成、数字人口播和 AI 视频生成，可以把一篇普通文稿快速转换成可发布的视频内容。\n\n本工具的目标是把这些步骤整",
+                                   "keywords":  [
+
+                                                ],
+                                   "style":  "知识口播",
+                                   "estimatedDuration":  54,
+                                   "segments":  [
+                                                    {
+                                                        "index":  1,
+                                                        "voiceText":  "人工智能正在改变内容生产方式。过去制作一条完整视频通常需要文案、配音、拍摄、剪辑和后期多个环节配合完成。现在，通过文本理解、语音合成、数字人口播和 AI 视频生成，可以把一篇普通文稿快速转换成可发布的视频内容。",
+                                                        "subtitle":  "人工智能正在改变内容生产方式。过去制作一条完整视频通常需要文案、配音、拍摄、剪辑和后期多个环节配合完成。现在，通过文本理解、语音合成、数字人口播和 AI 视频生成，可以把一篇普通文稿快速转换成可发布的视频内容。",
+                                                        "visualPrompt":  "围绕以下内容生成画面：人工智能正在改变内容生产方式。过去制作一条完整视频通常需要文案、配音、拍摄、剪辑和后期多个环节配合完成。现在，通过文本理解、语音合成、数字人",
+                                                        "duration":  27,
+                                                        "sceneType":  "avatar"
+                                                    },
+                                                    {
+                                                        "index":  2,
+                                                        "voiceText":  "本工具的目标是把这些步骤整合到本地电脑中。用户只需要导入一个 txt 文件，系统就能生成口播脚本、配音音频、字幕文件和视频合成配置。后续接入数字人和 AI 视频接口后，还可以进一步自动生成完整的数字人口播视频。",
+                                                        "subtitle":  "本工具的目标是把这些步骤整合到本地电脑中。用户只需要导入一个 txt 文件，系统就能生成口播脚本、配音音频、字幕文件和视频合成配置。后续接入数字人和 AI 视频接口后，还可以进一步自动生成完整的数字人口播视频。",
+                                                        "visualPrompt":  "围绕以下内容生成画面：本工具的目标是把这些步骤整合到本地电脑中。用户只需要导入一个 txt 文件，系统就能生成口播脚本、配音音频、字幕文件和视频合成配置。后续接入",
+                                                        "duration":  27,
+                                                        "sceneType":  "avatar"
+                                                    }
+                                                ]
+                               },
+                    "files":  {
+                                  "input":  "D:\\linshi\\video\\projects\\project_20260623_133210\\input\\source.txt",
+                                  "scriptJson":  "D:\\linshi\\video\\projects\\project_20260623_133210\\script\\script.json",
+                                  "subtitles":  "D:\\linshi\\video\\projects\\project_20260623_133210\\output\\subtitles.srt",
+                                  "project":  "D:\\linshi\\video\\projects\\project_20260623_133210\\project.json",
+                                  "audio":  "D:\\linshi\\video\\projects\\project_20260623_133210\\audio\\voice.wav",
+                                  "video":  null,
+                                  "assetPlan":  "D:\\linshi\\video\\projects\\project_20260623_133210\\video\\asset_plan.json",
+                                  "scriptMarkdown":  "D:\\linshi\\video\\projects\\project_20260623_133210\\script\\script.md",
+                                  "renderPlan":  "D:\\linshi\\video\\projects\\project_20260623_133210\\output\\render_plan.json",
+                                  "log":  "D:\\linshi\\video\\projects\\project_20260623_133210\\logs\\task.log"
+                              },
+                    "status":  {
+                                   "compose":  {
+                                                   "output":  null,
+                                                   "message":  "未检测到 ffmpeg，已生成渲染计划、音频和字幕。",
+                                                   "success":  false,
+                                                   "renderPlan":  "D:\\linshi\\video\\projects\\project_20260623_133210\\output\\render_plan.json"
+                                               },
+                                   "tts":  {
+                                               "message":  "已生成系统 TTS 音频。",
+                                               "textPath":  "D:\\linshi\\video\\projects\\project_20260623_133210\\audio\\voice.txt",
+                                               "skipped":  false,
+                                               "success":  true
+                                           }
+                               }
+                }
+}
+

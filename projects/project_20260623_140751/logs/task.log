@@ -1,0 +1,6 @@
+﻿project=project_20260623_140751
+mode=mixed_avatar_ai_video
+script=D:\linshi\video\projects\project_20260623_140751\script\script.json
+audio=D:\linshi\video\projects\project_20260623_140751\audio\voice.wav
+tts=已生成系统 TTS 音频。
+compose=未检测到 ffmpeg，已生成渲染计划、音频和字幕。

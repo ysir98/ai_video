@@ -1,0 +1,37 @@
+﻿{
+    "projectName":  "project_20260623_140307",
+    "inputFile":  "D:\\linshi\\video\\projects\\project_20260623_140307\\input\\source.txt",
+    "generationMode":  "ai_video_only",
+    "script":  {
+                   "summary":  "你好我好，大家好，好好学习天天向上",
+                   "title":  "AI 视频 - 你好我好，大家好，好好学习天天向上",
+                   "segments":  [
+                                    {
+                                        "index":  1,
+                                        "voiceText":  "你好我好，大家好，好好学习天天向上",
+                                        "subtitle":  "你好我好，大家好，好好学习天天向上",
+                                        "visualPrompt":  "围绕以下内容生成画面：你好我好，大家好，好好学习天天向上",
+                                        "duration":  5,
+                                        "sceneType":  "ai_video"
+                                    }
+                                ]
+               },
+    "voice":  {
+                  "type":  "system",
+                  "rate":  7,
+                  "volume":  100
+              },
+    "video":  {
+                  "fps":  30,
+                  "ratio":  "9:16",
+                  "resolution":  "1080p"
+              },
+    "subtitle":  {
+                     "enabled":  true
+                 },
+    "output":  {
+                   "path":  "D:\\linshi\\video\\projects\\project_20260623_140307\\output",
+                   "format":  "mp4"
+               },
+    "createdAt":  "2026-06-23T14:03:08"
+}

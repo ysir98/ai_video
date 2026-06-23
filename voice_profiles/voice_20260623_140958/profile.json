@@ -1,0 +1,10 @@
+﻿{
+    "id":  "voice_20260623_140958",
+    "name":  "测试克隆音色",
+    "type":  "clone",
+    "provider":  "local_sample_pending_clone_provider",
+    "sampleFileName":  "sample.wav",
+    "samplePath":  "D:\\linshi\\video\\voice_profiles\\voice_20260623_140958\\sample.wav",
+    "note":  "当前版本已保存语音样本和音色档案；接入真实语音克隆服务后可用该样本创建 voiceId。",
+    "createdAt":  "2026-06-23T14:09:58"
+}

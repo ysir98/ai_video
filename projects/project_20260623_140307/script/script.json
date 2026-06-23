@@ -1,0 +1,19 @@
+﻿{
+    "title":  "AI 视频 - 你好我好，大家好，好好学习天天向上",
+    "summary":  "你好我好，大家好，好好学习天天向上",
+    "keywords":  [
+
+                 ],
+    "style":  "知识口播",
+    "estimatedDuration":  5,
+    "segments":  [
+                     {
+                         "index":  1,
+                         "voiceText":  "你好我好，大家好，好好学习天天向上",
+                         "subtitle":  "你好我好，大家好，好好学习天天向上",
+                         "visualPrompt":  "围绕以下内容生成画面：你好我好，大家好，好好学习天天向上",
+                         "duration":  5,
+                         "sceneType":  "ai_video"
+                     }
+                 ]
+}

@@ -1,0 +1,43 @@
+﻿{
+    "generationMode":  "ai_video_only",
+    "modeName":  "单 AI 创作视频",
+    "createdAt":  "2026-06-23T14:03:08",
+    "providers":  {
+                      "tts":  "windows_system_speech_or_external_tts",
+                      "text":  "configured_or_local_fallback",
+                      "avatar":  "pending",
+                      "voiceClone":  "pending",
+                      "aiVideo":  "pending",
+                      "composer":  "ffmpeg_optional"
+                  },
+    "renderStrategy":  "Generate AI video scenes from prompts, concatenate scenes, then mix voice and subtitles.",
+    "options":  {
+                    "generationMode":  "ai_video_only",
+                    "style":  "知识口播",
+                    "ratio":  "9:16",
+                    "resolution":  "1080p",
+                    "fps":  30,
+                    "voice":  {
+                                  "type":  "system",
+                                  "rate":  7,
+                                  "volume":  100
+                              }
+                },
+    "segments":  [
+                     {
+                         "index":  1,
+                         "duration":  5,
+                         "sceneMode":  "ai_video_scene",
+                         "voiceText":  "你好我好，大家好，好好学习天天向上",
+                         "subtitle":  "你好我好，大家好，好好学习天天向上",
+                         "visualPrompt":  "围绕以下内容生成画面：你好我好，大家好，好好学习天天向上",
+                         "requiredAssets":  [
+                                                "voice_audio",
+                                                "ai_video_scene",
+                                                "subtitle",
+                                                "background_music"
+                                            ],
+                         "status":  "pending_provider_integration"
+                     }
+                 ]
+}
